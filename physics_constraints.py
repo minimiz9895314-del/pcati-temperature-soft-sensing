@@ -11,6 +11,10 @@ def steady_state_loss(pred, Tg, Te, hconv, heff):
     weighted_avg = (hconv * As * Tg + heff * As * Te) / (hconv * As + heff * As)
     return torch.mean((pred - weighted_avg) ** 2)
 
+def steady_state_loss(pred, Tg, Te, hconv, heff):
+    weighted_avg = (hconv * As * Tg + heff * As * Te) / (hconv * As + heff * As)
+    return torch.mean((pred - weighted_avg) ** 2)
+
 def temp_rate_loss(pred, prev_pred, Tg, ms, cs, As, hconv, heff, dt):
     dT_dt = (pred - prev_pred) / dt
     max_rate = (hconv * As + heff * As) / (ms * cs) * torch.abs(Tg - pred)
@@ -22,4 +26,5 @@ def physics_loss(pred, prev_pred, Tg, Te, params, dt):
     l_energy = energy_conservation_loss(pred, prev_pred, Tg, Te, ms, cs, As, hconv, heff, dt)
     l_steady = steady_state_loss(pred, Tg, Te, hconv, heff)
     l_temp = temp_rate_loss(pred, prev_pred, Tg, ms, cs, As, hconv, heff, dt)
+
     return 0.33 * l_energy + 0.33 * l_steady + 0.34 * l_temp
