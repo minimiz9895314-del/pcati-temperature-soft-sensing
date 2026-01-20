@@ -14,7 +14,7 @@ class GatedConvUnit(nn.Module):
         Hg = torch.sigmoid(self.gate_conv(x))
         return Hg * Hf
 
-class GatedConvModule(nn.Module):
+class GatedConvModule(nn.Module)
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.gcu3 = GatedConvUnit(in_channels, out_channels, 3)
@@ -118,4 +118,5 @@ class BayesianGatedConvTransformer(nn.Module):
         x = torch.mean(x, dim=1)  # Global average pooling
         mean = self.mean_head(x)
         var = F.softplus(self.var_head(x))  # Ensure positive variance
+
         return mean, var
