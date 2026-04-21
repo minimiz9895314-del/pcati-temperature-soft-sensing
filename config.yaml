@@ -1,0 +1,187 @@
+# =============================================================================
+# Hyperparameter Configuration for PCATI Temperature Soft-Sensing
+# Paper: Physics-Constrained Adaptive Temperature Inference with BGCT and DTC
+# =============================================================================
+# This file documents the complete hyperparameter settings used in the
+# case study (Section 4) for the proposed BGCT model, the DTC module,
+# and all compared baseline methods.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Dataset & Data Split
+# -----------------------------------------------------------------------------
+dataset:
+  name: ITP
+  sampling_rate_hz: 1            # DTC validation sampling rate (Section 4.3)
+  historical_window: 30          # w = 30 time steps
+  train_ratio: 0.75              # 75% / 25% train-test split (Section 4.1)
+  test_ratio: 0.25
+  shuffle: false                 # temporal order preserved
+  normalization: z-score
+
+
+# -----------------------------------------------------------------------------
+# 2. Proposed BGCT Model
+# -----------------------------------------------------------------------------
+bgct:
+  # --- Multi-scale Gated Convolutional Unit (Section 3.2.2) ---
+  gcu:
+    kernel_sizes: [3, 5, 7]
+    num_filters_per_branch: 64
+    activation: gelu
+
+  # --- Temperature-aware Transformer Encoder (Section 3.2.3) ---
+  transformer:
+    num_layers: 2
+    model_dim: 128
+    num_heads: 3                 # h = 3
+    ffn_dim: 256
+    positional_encoding:
+      type: thermal_aware
+      alpha: 0.54                # thermal-aware weighting factor
+
+  # --- Bayesian Inference (Section 3.2.4) ---
+  bayesian:
+    mc_samples: 50               # T = 50 Monte Carlo iterations
+    dropout_conv: 0.2            # structured dropout in conv layers
+    dropout_fc: 0.4              # structured dropout in FC layers
+
+  # --- Physics-constrained Loss Weights (Section 3.3) ---
+  loss_weights:
+    lambda1: 1.0                 # data-fitting term
+    lambda2: 0.1                 # physics-consistency term
+    lambda3: 0.01                # uncertainty regularization term
+    adaptive_update: true
+
+  # --- Optimization ---
+  training:
+    optimizer: adam
+    learning_rate: 1.0e-3
+    batch_size: 64
+    max_epochs: 200
+    early_stopping_patience: 20  # on validation loss
+    gradient_clip: 1.0
+    framework: pytorch
+
+  # --- Hardware ---
+  hardware:
+    gpu: NVIDIA RTX 3090
+    vram_gb: 24
+
+
+# -----------------------------------------------------------------------------
+# 3. Dynamic Thermocouple Compensation (DTC) Module
+# -----------------------------------------------------------------------------
+dtc:
+  sampling_interval_s: 1.0       # dt = 1 s (matches 1 Hz acquisition)
+
+  # --- Kalman Filter (Section 3.1.2) ---
+  kalman_filter:
+    process_noise_Q: [[0.1, 0.0], [0.0, 0.01]]   # Q = diag(0.1, 0.01)
+    measurement_noise_R: 1.0
+    initial_covariance_P0_scale: 10              # P0 = 10 * I
+
+  # --- Recursive Least Squares (Section 3.1.3) ---
+  rls:
+    forgetting_factor: 0.97      # lambda in [0.95, 0.99]
+    init_from: manufacturer_spec # nominal thermocouple parameters
+
+  # --- Thermocouple Parameters (adaptively refined online) ---
+  thermocouple_params:
+    ms_cs_init: nominal          # mass * specific heat capacity
+    hconv_As_init: nominal       # convective heat transfer coefficient * area
+    heff_As_init: nominal        # effective heat transfer coefficient * area
+
+
+# -----------------------------------------------------------------------------
+# 4. Baseline Methods (Section 4.4)
+# -----------------------------------------------------------------------------
+# All baselines share the same optimizer, learning rate, batch size,
+# number of epochs, and train/test split as the proposed BGCT model
+# for a fair comparison.
+# -----------------------------------------------------------------------------
+
+baselines:
+
+  # Shared training setup
+  shared:
+    optimizer: adam
+    learning_rate: 1.0e-3
+    batch_size: 64
+    max_epochs: 200
+    train_test_split: [0.75, 0.25]
+
+  # --- Transformer-based models ---
+  informer:
+    num_encoder_layers: 2
+    model_dim: 128
+    num_heads: 8
+
+  autoformer:
+    num_encoder_layers: 2
+    model_dim: 128
+    num_heads: 8
+
+  pyraformer:
+    num_encoder_layers: 2
+    model_dim: 128
+    num_heads: 8
+
+  transformer_autoencoder:
+    num_encoder_layers: 2
+    model_dim: 128
+    num_heads: 8
+
+  transformer_seq2seq:
+    num_encoder_layers: 2
+    num_decoder_layers: 1
+    model_dim: 128
+    num_heads: 8
+
+  # --- Physics-informed baseline ---
+  coupled_pinns:
+    mlp_layers: 5
+    hidden_units: 128
+    physics_loss_weight: 0.1
+
+  # --- Graph-based baseline ---
+  mtgnn:
+    num_gc_layers: 3
+    mix_hop_depth: 2
+    node_embedding_dim: 64
+
+  # --- Attention-based baseline ---
+  dast:
+    attention_type: dual_stage
+    hidden_dim: 128
+
+  # --- CNN-LSTM baseline (matches Table 7) ---
+  cnn_lstm:
+    num_conv_layers: 2
+    conv_filters: 64
+    conv_kernel_size: 3
+    num_lstm_layers: 2
+    lstm_hidden_units: 128
+
+  # --- Bayesian baselines (uncertainty comparison) ---
+  bayes_lstm:
+    num_lstm_layers: 2
+    lstm_hidden_units: 128
+    mc_dropout_rate: 0.3
+    mc_samples: 50               # same T as BGCT for fair comparison
+
+  deep_gaussian_process:
+    backbone: lstm
+    lstm_hidden_units: 128
+    mc_dropout_rate: 0.3
+    mc_samples: 50               # same T as BGCT for fair comparison
+
+
+# -----------------------------------------------------------------------------
+# 5. Reproducibility
+# -----------------------------------------------------------------------------
+reproducibility:
+  random_seed: 42
+  deterministic: true
+  cudnn_benchmark: false
